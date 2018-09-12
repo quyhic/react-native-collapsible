@@ -13,6 +13,7 @@ export default class Collapsible extends Component {
     duration: PropTypes.number,
     easing: PropTypes.oneOfType([PropTypes.string, PropTypes.func]),
     style: ViewPropTypes.style,
+    onAnimationEnd: PropTypes.func,
     children: PropTypes.node,
   };
 
@@ -22,6 +23,7 @@ export default class Collapsible extends Component {
     collapsedHeight: 0,
     duration: 300,
     easing: 'easeOutCubic',
+    onAnimationEnd: () => null,
   };
 
   constructor(props) {
@@ -35,14 +37,24 @@ export default class Collapsible extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.collapsed !== this.props.collapsed) {
-      this._toggleCollapsed(nextProps.collapsed);
+  componentDidUpdate(prevProps) {
+    if (prevProps.collapsed !== this.props.collapsed) {
+      this.setState({ measured: false }, () =>
+        this._componentDidUpdate(prevProps)
+      );
+    } else {
+      this._componentDidUpdate(prevProps);
+    }
+  }
+
+  _componentDidUpdate(prevProps) {
+    if (prevProps.collapsed !== this.props.collapsed) {
+      this._toggleCollapsed(this.props.collapsed);
     } else if (
-      nextProps.collapsed &&
-      nextProps.collapsedHeight !== this.props.collapsedHeight
+      this.props.collapsed &&
+      prevProps.collapsedHeight !== this.props.collapsedHeight
     ) {
-      this.state.height.setValue(nextProps.collapsedHeight);
+      this.state.height.setValue(this.props.collapsedHeight);
     }
   }
 
@@ -132,7 +144,9 @@ export default class Collapsible extends Component {
       toValue: height,
       duration,
       easing,
-    }).start(() => this.setState({ animating: false }));
+    }).start(() =>
+      this.setState({ animating: false }, this.props.onAnimationEnd)
+    );
   }
 
   _handleLayoutChange = event => {
@@ -145,6 +159,7 @@ export default class Collapsible extends Component {
     ) {
       return;
     }
+
     this.state.height.setValue(contentHeight);
     this.setState({ contentHeight });
   };

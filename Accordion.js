@@ -12,6 +12,7 @@ export default class Accordion extends Component {
     sections: PropTypes.array.isRequired,
     renderHeader: PropTypes.func.isRequired,
     renderContent: PropTypes.func.isRequired,
+    renderSectionTitle: PropTypes.func,
     onChange: PropTypes.func,
     align: PropTypes.oneOf(['top', 'center', 'bottom']),
     duration: PropTypes.number,
@@ -24,11 +25,18 @@ export default class Accordion extends Component {
     underlayColor: PropTypes.string,
     touchableComponent: PropTypes.func,
     touchableProps: PropTypes.object,
+    disabled: PropTypes.bool,
+    expandFromBottom: PropTypes.bool,
+    onAnimationEnd: PropTypes.func,
   };
 
   static defaultProps = {
     underlayColor: 'black',
+    disabled: false,
+    expandFromBottom: false,
     touchableComponent: TouchableHighlight,
+    renderSectionTitle: () => null,
+    onAnimationEnd: () => null,
   };
 
   constructor(props) {
@@ -43,25 +51,36 @@ export default class Accordion extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.activeSection !== undefined) {
+  componentDidUpdate(prevProps) {
+    if (
+      this.props.activeSection !== undefined &&
+      this.props.activeSection !== prevProps.activeSection
+    ) {
       this.setState({
-        activeSection: nextProps.activeSection,
+        activeSection: this.props.activeSection,
       });
     }
   }
 
   _toggleSection(section) {
-    const activeSection =
-      this.state.activeSection === section ? false : section;
+    if (!this.props.disabled) {
+      const activeSection =
+        this.state.activeSection === section ? false : section;
 
-    if (this.props.activeSection === undefined) {
-      this.setState({ activeSection });
-    }
-    if (this.props.onChange) {
-      this.props.onChange(activeSection);
+      if (this.props.activeSection === undefined) {
+        this.setState({ activeSection });
+      }
+      if (this.props.onChange) {
+        this.props.onChange(activeSection);
+      }
     }
   }
+
+  handleErrors = () => {
+    if (!Array.isArray(this.props.sections)) {
+      throw new Error('Sections should be an array');
+    }
+  };
 
   render() {
     let viewProps = {};
@@ -74,12 +93,37 @@ export default class Accordion extends Component {
       }
     });
 
+    this.handleErrors();
+
     const Touchable = this.props.touchableComponent;
+
+    const renderCollapsible = (section, key) => (
+      <Collapsible
+        collapsed={this.state.activeSection !== key}
+        {...collapsibleProps}
+        onAnimationEnd={() => this.props.onAnimationEnd(section, key)}
+      >
+        {this.props.renderContent(
+          section,
+          key,
+          this.state.activeSection === key,
+          this.props.sections
+        )}
+      </Collapsible>
+    );
 
     return (
       <View {...viewProps}>
-        {this.props.sections.map((section, key) =>
+        {this.props.sections.map((section, key) => (
           <View key={key}>
+            {this.props.renderSectionTitle(
+              section,
+              key,
+              this.state.activeSection === key
+            )}
+
+            {this.props.expandFromBottom && renderCollapsible(section, key)}
+
             <Touchable
               onPress={() => this._toggleSection(key)}
               underlayColor={this.props.underlayColor}
@@ -88,21 +132,14 @@ export default class Accordion extends Component {
               {this.props.renderHeader(
                 section,
                 key,
-                this.state.activeSection === key
+                this.state.activeSection === key,
+                this.props.sections
               )}
             </Touchable>
-            <Collapsible
-              collapsed={this.state.activeSection !== key}
-              {...collapsibleProps}
-            >
-              {this.props.renderContent(
-                section,
-                key,
-                this.state.activeSection === key
-              )}
-            </Collapsible>
+
+            {!this.props.expandFromBottom && renderCollapsible(section, key)}
           </View>
-        )}
+        ))}
       </View>
     );
   }
